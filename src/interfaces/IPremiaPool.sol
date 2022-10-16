@@ -17,17 +17,6 @@ interface IPool {
     function deposit(uint256 amount, bool isCallPool) external payable;
 
     /**
-     * @notice  swap any token to collateral asset through exchange proxy and deposit
-     * @dev     any attached msg.value will be wrapped.
-     *          if tokenIn is wrappedNativeToken, both msg.value and {amountInMax} amount of wrappedNativeToken will be used
-     * @param s swap arguments
-     * @param isCallPool whether to deposit underlying in the call pool or base in the put pool
-     */
-    function swapAndDeposit(IPoolInternal.SwapArgs memory s, bool isCallPool)
-        external
-        payable;
-
-    /**
      * @notice redeem pool share tokens for underlying asset
      * @param amount quantity of share tokens to redeem
      * @param isCallPool whether to deposit underlying in the call pool or base in the put pool
@@ -46,6 +35,19 @@ interface IPool {
      * @param isCallPool true for call, false for put
      */
     function claimRewards(address account, bool isCallPool) external;
+
+    
+    /**
+     * @notice get TVL (total value locked) for given address
+     * @param account address whose TVL to query
+     * @return underlyingTVL user total value locked in call pool (in underlying token amount)
+     * @return baseTVL user total value locked in put pool (in base token amount)
+     */
+    function getUserTVL(address account)
+        external
+        view
+        returns (uint256 underlyingTVL, uint256 baseTVL);
+
 
 
 }

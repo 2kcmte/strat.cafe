@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.11;
 
 interface IAlchemistV2 {
@@ -436,22 +437,22 @@ interface IAlchemistV2 {
 
         returns (uint256);
 
-    function convertYieldTokensToShares(address yieldToken, uint256 amount) public view returns (uint256);
+    function convertYieldTokensToShares(address yieldToken, uint256 amount) external view returns (uint256);
 
-    function convertSharesToYieldTokens(address yieldToken, uint256 shares) public view returns (uint256);
+    function convertSharesToYieldTokens(address yieldToken, uint256 shares) external view returns (uint256);
 
-    function convertSharesToUnderlyingTokens(address yieldToken, uint256 shares) public view returns (uint256);
+    function convertSharesToUnderlyingTokens(address yieldToken, uint256 shares) external view returns (uint256);
 
-    function convertYieldTokensToUnderlying(address yieldToken, uint256 amount) public view returns (uint256);
+    function convertYieldTokensToUnderlying(address yieldToken, uint256 amount) external view returns (uint256);
 
-    function convertUnderlyingTokensToYield(address yieldToken, uint256 amount) public view returns (uint256);
+    function convertUnderlyingTokensToYield(address yieldToken, uint256 amount) external view returns (uint256);
 
-    function convertUnderlyingTokensToShares(address yieldToken, uint256 amount) public view returns (uint256);
+    function convertUnderlyingTokensToShares(address yieldToken, uint256 amount) external view returns (uint256);
 
-    function normalizeUnderlyingTokensToDebt(address underlyingToken, uint256 amount) public view returns (uint256);
+    function normalizeUnderlyingTokensToDebt(address underlyingToken, uint256 amount) external view returns (uint256);
 
-    function normalizeDebtTokensToUnderlying(address underlyingToken, uint256 amount) public view returns (uint256);
+    function normalizeDebtTokensToUnderlying(address underlyingToken, uint256 amount) external view returns (uint256);
 
-    function totalValue(address owner) public view returns (uint256);
+    function totalValue(address owner) external view returns (uint256);
 
 }
