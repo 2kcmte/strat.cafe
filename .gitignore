@@ -3,6 +3,7 @@ cache/
 out/
 node_modules
 package.json
+.DS_Store
 
 # Ignores development broadcast logs
 !/broadcast
