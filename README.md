@@ -3,5 +3,5 @@
 # strat.cafe •
 wip
 
-## alcx-premia strat
+## [alcx-premia strat](src/strategies/AlcxPremiaStrat.sol)
 This strategy deposits funds into [alchemix protocol](https://alchemix.fi/), borrows altoken equivalent (self repaying loan) and writes options on [premia pools](https://app.premia.finance/pools) while earning premia token rewards.
