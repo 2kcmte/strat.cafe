@@ -1,10 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 interface IStrategy {
+
+  function name() external view returns(string memory);
+
+  function balance() external view returns(uint256);
+
   function currentValue() external view returns(uint256);
-  function closePosition() external;
+
+  function deposit() external;
+
+  function withdraw(uint256) external;
+
+  function withdrawAll() external;
+
   function harvestRewards() external;
-  function execute() external;
-  function unwind(uint256 amount) external;
-  function transferUnderlyingToVault(uint256 _amount) external;
+  
 }

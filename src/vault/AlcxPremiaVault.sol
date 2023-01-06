@@ -1,89 +1,88 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 import "solmate/mixins/ERC4626.sol";
-import "./IStrategy.sol";
+import "solmate/auth/Auth.sol";
+import "../helpers/FeeManager.sol";
+import "../interfaces/IStrategy.sol";
+import "../utils/Constants.sol";
+import "../utils/Errors.sol";
 
-contract Vault is ERC4626 {
+contract Vault is ERC4626, Auth {
 
-  uint256 public constant BASE = 10000;
-  uint256 public cap;
-  address public owner;
-  uint256 public fee;
-  address public feeRecipient;
-  uint256 lockedAsset;
-  mapping(address => uint256) pendingWithdrawals;
+  uint256 public depositCap;
+  uint256 public totalDeposit;
+  ERC20 public immutable underlying;
+
+  uint256 public managementFee;
+  uint256 public vaultLiquidityTarget;
+  FeeManager public feeRecipient;
+
   IStrategy public strategy;
 
-
   constructor(
-    ERC20 _asset,
-    string memory name,
-    string memory symbol,
-    address _owner,
-    address _feeRecipient
-  ) ERC4626(_asset, name, symbol){
-    owner = _owner;
-    feeRecipient = _feeRecipient;
+    ERC20 _underlying
+  ) 
+  ERC4626(
+    _underlying, 
+    string(abi.encodePacked("AlcxPremiaStrat ", _underlying.name(), " Vault")),
+    string(abi.encodePacked("ap", _underlying.symbol()))
+  )
+  Auth(Auth(msg.sender).owner(), Auth(msg.sender).authority())
+  {
+    underlying = _underlying;
   }
-
 
   function totalAssets() public view override returns(uint256){
-    return _pendingDeposits() + strategy.currentValue();
+    return _vaultLiquidity() + strategy.currentValue();
   }
 
-  function _pendingDeposits() public view returns(uint256){
-    return asset.balanceOf(address(this));
+  function _vaultLiquidity() public view returns(uint256){
+    return underlying.balanceOf(address(this));
   }
 
-  function deposit(uint256 _asset, address reciever) public override returns(uint256){
-    if(cap > 0 && _asset + totalAssets() > cap) revert("CAP_EXCEEDED");
-    return super.deposit(_asset - fee, reciever);
+  function setFeeRecipient(address _feeRecipient) public requiresAuth {
+    feeRecipient = FeeManager(_feeRecipient);
   }
-  function mint(uint256 _shares, address receiver) public override returns (uint256){
-    if(cap > 0 && previewMint(_shares)  + totalAssets() > cap) revert("CAP_EXCEEDED");
-    return super.mint(_shares, receiver);
-  }
-  function withdraw(uint256 assets, address receiver, address _owner) public override returns (uint256){
-    if(_pendingDeposits() < assets) revert("NO_LIQUIDITY");
-    return super.withdraw(assets, receiver, _owner);
-  }
-  function redeem(uint256 shares, address receiver, address _owner) public override returns (uint256){
-    if(_pendingDeposits() < previewRedeem(shares)) revert("NO_LIQUIDITY");
-    return super.redeem(shares, receiver, _owner);
-  }
+
   function depositIntoStrategy(uint256 _amount) public {
-    asset.transfer(address(strategy), _amount);
-    strategy.mintAlTokenAndWriteOptions();
-    uint256 _fee = _amount * (fee / BASE);
-    _mint(address(this), _fee);
-  }
-  function withdrawFromStrategy(uint256 _amount) internal {
-    strategy.withdrawUnderlying(_amount);
-  }
-  function closeVaultPosition() public {
-    strategy.closePosition();
-  }
-  function harvestStrategyRewards() external {
-    uint256 _before = _totalDebt();
-    strategy.harvestRewards();
-    uint256 _after = _totalDebt();
-    uint256 _fee = _before - _after * (fee / BASE);
-    _mint(address(this), _fee);
+    require(_amount != Constants.ZERO, Errors.INVALID_AMOUNT);
+    _depositUnderlyingIntoStrategy(_amount);
   }
 
-  function claimFees() external {
-    uint256 amount = asset.balanceOf(address(this));
-    asset.transfer(feeRecipient, amount);
+  function _depositUnderlyingIntoStrategy(uint256 _amount) internal {
+    underlying.transfer(address(strategy), _amount);
+    strategy.deposit();
   }
-  function setCap(uint256 _cap) public {
-    cap = _cap;
-  }
-  function setStrategy(address _strategy) public {
+
+  function setStrategy(address _strategy) public requiresAuth {
     strategy = IStrategy(_strategy);
   }
 
-  function _totalDebt() internal view returns (uint256) {
-    return strategy.currentValue();
+  function setCap(uint256 _cap) public requiresAuth {
+    uint256 previousCap = depositCap;
+    require(_cap > previousCap, Errors.CAP_EXCEEDED);
+    depositCap = _cap;
   }
 
+  function claimFees() public {}
+
+  function beforeWithdraw(uint256 assets, uint256) internal override {
+        // Retrieve underlying tokens from strategies.
+        _withdrawUnderlying(assets);
+    }
+
+  function afterDeposit(uint256 assets, uint256) internal view override {
+    if(depositCap > 0){
+      require(totalDeposit + assets <= depositCap, Errors.CAP_EXCEEDED);
+    }
+  }
+
+  function _withdrawUnderlying(uint256 _amount) internal {
+
+  }
+  
+  function harvest() external {
+    
+  }
+ 
 }

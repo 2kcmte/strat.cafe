@@ -1,0 +1,11 @@
+{
+  "name": "alcx-premia-vault",
+  "version": "1.0.0",
+  "main": "index.js",
+  "author": "nonso <0xnonso@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "@openzeppelin/contracts": "^4.8.0",
+    "@uniswap/v3-periphery": "^1.4.1"
+  }
+}

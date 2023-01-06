@@ -1,65 +1,77 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
-import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
-import '../interfaces/ICurvePool.sol';
-import 'lib/solmate/src/tokens/ERC20.sol';
-import 'lib/solmate/src/utils/SafeTransferLib.sol';
-
+import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
+import "solmate/tokens/ERC20.sol";
+import "solmate/utils/SafeTransferLib.sol";
+import "solmate/utils/FixedPointMathLib.sol";
+import "./OracleWrapper.sol";
+import "../interfaces/curve/ICurvePool.sol";
+import "../utils/Errors.sol";
+import "../utils/Constants.sol";
 
 contract SwapHelper {
     using SafeTransferLib for ERC20;
+    using SafeCast for uint256;
+    using SafeCast for int256;
+    using FixedPointMathLib for uint256;
 
-    ISwapRouter public constant swapRouter = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
-    uint256 public immutable maxSlippageTolerance;
+    OracleWrapper public immutable oracle;
+    uint256 public immutable slippageTolerance;
 
-    constructor(uint256 _maxSlippageTolerance){
-        maxSlippageTolerance = _maxSlippageTolerance;
+    constructor(address _oracle, uint256 _slippageTolerance){
+        oracle = OracleWrapper(_oracle);
+        slippageTolerance = _slippageTolerance;
     }
 
     function uniSwap(address _tokenIn, address _tokenOut) external returns(uint256){
-        uint256 _amount = _amount(_tokenIn);
-        _approve(_tokenIn, address(uniswapRouter), _amount);
+        // amount to swap
+        uint256 _amount = _amountToSwap(_tokenIn);
+        // approve token to uniswap router
+        _approve(_tokenIn, address(Constants.SWAP_ROUTER), _amount);
 
         uint256 deadline = block.timestamp + 15; // using 'now' for convenience
-        address tokenIn = _tokenIn;
-        address tokenOut = _tokenOut;
         uint24 fee = 3000;
-        address recipient = msg.sender;
-        uint256 amountIn = _amount;
-        uint256 amountOutMinimum = 0;
-        uint160 sqrtPriceLimitX96 = 0;
+        uint256 amountOutVirtual = oracle.getQuoteAmount(_tokenOut, _tokenIn, _amount);
+        uint256 amountOutMinimum = amountOutVirtual - (amountOutVirtual * slippageTolerance/Constants.BASE);
+        uint160 sqrtPriceLimitX96;
         
         ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams(
-            tokenIn,
-            tokenOut,
+            _tokenIn,
+            _tokenOut,
             fee,
-            recipient,        
+            msg.sender,        
             deadline,
-            amountIn,
+            _amount,
             amountOutMinimum,
             sqrtPriceLimitX96
         );
-        return swapRouter.exactInputSingle(params);
+        return Constants.SWAP_ROUTER.exactInputSingle(params);
     }
     
-    function curveSwap(address _tokenIn) internal {
-        uint256 _amount = _amount(_tokenIn);
+    function curveSwap(address _tokenIn, ICurvePool curvePool) external returns(uint256){
+        uint256 _amount = _amountToSwap(_tokenIn);
+        // approve to curve pool
         _approve(_tokenIn, address(curvePool), _amount);
+        (uint256 i, uint256 j) = curvePool.coins(Constants.ONE) == _tokenIn 
+            ? (Constants.ONE, Constants.ZERO) : (Constants.ZERO, Constants.ONE);
 
-        (uint256 i, uint256 j) = curvePool.coins(1) == tokenIn ? (1,0) : (0,1);
-
-        curvePool.exchange(i, j, _amount, 0);
-        ERC20(_tokenIn).safeTransfer(msg.sender, _amount(curvePool.coins(j)));
+        curvePool.exchange(
+            i.toInt256().toInt128(), 
+            j.toInt256().toInt128(), 
+            _amount, 
+            _amount - (_amount * slippageTolerance/Constants.BASE)
+        );
+        uint256 amtOut = _amountToSwap(curvePool.coins(j));
+        ERC20(_tokenIn).safeTransfer(msg.sender, amtOut);
+        return amtOut;
     }
 
     function _approve(address _token, address _to, uint256 _amount) internal {
         ERC20(_token).safeApprove(_to, _amount);
     }
 
-    function _amount(address _token) internal {
-        ERC20(_token).balanceOf(address(this));
+    function _amountToSwap(address _token) internal view returns(uint256){
+        return ERC20(_token).balanceOf(address(this));
     }
-
-    function calculateMinAmountOut() internal {}
 
 }
