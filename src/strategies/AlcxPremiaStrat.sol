@@ -144,7 +144,7 @@ contract AlcxPremiaStrat is IStrategy, Pausable, ERC1155TokenReceiver {
       // transfer contract premia token balance to swap helper
       ERC20(premiaToken).transfer(address(swapHelper), premiaBal);
       // swap premia token for underlying
-      uint256 amountOut = swapHelper.uniSwap(premiaToken, underlying);
+      uint256 amountOut = swapHelper.swapTokenMultiHopWeth(premiaToken, underlying);
       //trnasfer fee to fee manager
       _transferFee(amountOut * harvestFee/Constants.BASE);
       // harvest timestamp

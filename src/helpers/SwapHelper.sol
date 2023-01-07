@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
+import "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 import "solmate/tokens/ERC20.sol";
 import "solmate/utils/SafeTransferLib.sol";
 import "solmate/utils/FixedPointMathLib.sol";
@@ -23,11 +24,11 @@ contract SwapHelper {
         slippageTolerance = _slippageTolerance;
     }
 
-    function uniSwap(address _tokenIn, address _tokenOut) external returns(uint256){
+    function uniSwapV3(address _tokenIn, address _tokenOut) external returns(uint256){
         // amount to swap
-        uint256 _amount = _amountToSwap(_tokenIn);
+        uint256 _amount = _totalBalance(_tokenIn);
         // approve token to uniswap router
-        _approve(_tokenIn, address(Constants.SWAP_ROUTER), _amount);
+        _approve(_tokenIn, address(Constants.SWAP_ROUTER_V3), _amount);
 
         uint256 deadline = block.timestamp + 15; // using 'now' for convenience
         uint24 fee = 3000;
@@ -45,11 +46,38 @@ contract SwapHelper {
             amountOutMinimum,
             sqrtPriceLimitX96
         );
-        return Constants.SWAP_ROUTER.exactInputSingle(params);
+        return Constants.SWAP_ROUTER_V3.exactInputSingle(params);
+    }
+
+    function sushiSwap(
+        address _tokenIn, 
+        address[] memory path,
+        uint256 minAmtOut
+    ) public {
+       Constants.SWAP_ROUTER_SUSHI.swapExactTokensForTokens(
+        _totalBalance(_tokenIn),
+        minAmtOut,
+        path,
+        msg.sender,
+        block.timestamp + 15 minutes
+       );
+    }
+
+    function swapTokenMultiHopWeth(address _tokenIn, address _tokenOut) external returns(uint256){
+        address[] memory path;
+        path[0] = _tokenIn;
+        if(_tokenIn != Constants.WETH && _tokenOut != Constants.WETH){
+            path[1] = Constants.WETH;
+            path[2] = _tokenOut;
+        } else {
+            path[1] = _tokenOut;
+        }
+        sushiSwap(_tokenIn, path, Constants.ZERO);
+        return _totalBalance(_tokenOut);
     }
     
     function curveSwap(address _tokenIn, ICurvePool curvePool) external returns(uint256){
-        uint256 _amount = _amountToSwap(_tokenIn);
+        uint256 _amount = _totalBalance(_tokenIn);
         // approve to curve pool
         _approve(_tokenIn, address(curvePool), _amount);
         (uint256 i, uint256 j) = curvePool.coins(Constants.ONE) == _tokenIn 
@@ -61,7 +89,7 @@ contract SwapHelper {
             _amount, 
             _amount - (_amount * slippageTolerance/Constants.BASE)
         );
-        uint256 amtOut = _amountToSwap(curvePool.coins(j));
+        uint256 amtOut = _totalBalance(curvePool.coins(j));
         ERC20(_tokenIn).safeTransfer(msg.sender, amtOut);
         return amtOut;
     }
@@ -70,7 +98,7 @@ contract SwapHelper {
         ERC20(_token).safeApprove(_to, _amount);
     }
 
-    function _amountToSwap(address _token) internal view returns(uint256){
+    function _totalBalance(address _token) internal view returns(uint256){
         return ERC20(_token).balanceOf(address(this));
     }
 
